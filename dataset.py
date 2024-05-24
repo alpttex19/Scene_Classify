@@ -1,27 +1,31 @@
 import os
 import torch
 import pandas as pd
+import cv2
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms.functional import pil_to_tensor
 
 
 class Scene_Dataset(Dataset):
-    def __init__(self, data_dir = "dataset",  mode="train"):
-        imgs_root = f"{data_dir}/imgs"
-        labels_root = f"{data_dir}/{mode}_data.csv"
+    def __init__(self, data_dir = "dataset",  mode="train", transform=None):
+        self.imgs_root = f"{data_dir}/imgs"
         # 读取csv文件
+        labels_root = f"{data_dir}/{mode}_data.csv"
         df = pd.read_csv(labels_root)
-        imgs_names = df['image_name'].tolist()
+        self.imgs_names = df['image_name'].tolist()
         labels = df['label'].tolist()
-        self.imgs = [pil_to_tensor(Image.open(f"{imgs_root}/{img_name}")) / 255 for img_name in imgs_names]
         self.labels = torch.tensor(labels)
+        self.transform = transform
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.imgs[idx].float(), self.labels[idx].long()
+        image = cv2.imread(f"{self.imgs_root}/{self.imgs_names[idx]}")
+        if self.transform :
+            image = self.transform(image)
+        return image.float(), self.labels[idx].long()
 
 
 if __name__ == "__main__":

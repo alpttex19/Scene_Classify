@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 from dataset import Scene_Dataset
 from VggNet import VggNet
+from data_augmentation import SSDAugmentation, SSDBaseTransform
 from torchvision.models import vgg16
 
 lables2name = {0:"建筑", 1:"森林", 2:"冰川", 3:"高山", 4:"大海", 5:"街景"}
@@ -20,16 +21,18 @@ def load_pretrained(path=None):
     return model
 
 def train(epochs, data_dir, batch_size):
+    ssdtransform = SSDBaseTransform()
     print("loading data for training...")
-    train_set = Scene_Dataset(data_dir, mode="train")
+    train_set = Scene_Dataset(data_dir, mode="train", transform=ssdtransform)
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
-    val_set = Scene_Dataset(data_dir, mode="val")
+    val_set = Scene_Dataset(data_dir, mode="val", transform=ssdtransform)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=4, drop_last=False)
-    average_loss = []
-    for epoch in range(epochs):
+    for epoch in (range(epochs)):
+        average_loss = []
         print(f"EPOCH: {epoch}/{epochs}")
         model.train()
-        for batch_idx, (inputs, labels) in enumerate(tqdm(train_loader)):
+        pbar = tqdm(train_loader)
+        for batch_idx, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -37,10 +40,9 @@ def train(epochs, data_dir, batch_size):
             loss.backward()
             average_loss.append(loss.item())
             optimizer.step()
-            if batch_idx % 50 == 0:
+            if batch_idx % 10 == 0:
                 average = sum(average_loss)/len(average_loss)
-                print(f"batch_idx: {batch_idx}, train_loss: {average}")
-                average_loss.clear()
+                pbar.set_postfix({"train_loss": average})
                 # print(outputs.shape, "output", outputs, "labels",labels)
         lr_scheduler.step()
 
@@ -54,7 +56,7 @@ def train(epochs, data_dir, batch_size):
                 total_samples += labels.size(0)
                 total_correct += (predicted == labels).sum().item()
             print(f"val_accuracy: {total_correct / total_samples}")
-    torch.save(model.state_dict(), "output/model.pth")
+    torch.save(model.state_dict(), "output/model_epochs_20.pth")
 
 
 def test(data_dir, batch_size):
@@ -65,7 +67,6 @@ def test(data_dir, batch_size):
     lables_list = []
     predicted_list = []
     with torch.no_grad():
-        total_samples, total_correct = 0, 0
         start_time = time.time()
         for batch_idx, (inputs, labels) in enumerate(tqdm(test_loader)):
             inputs, labels = inputs.to(device), labels.to(device)
@@ -79,10 +80,16 @@ def test(data_dir, batch_size):
         all_predicted = torch.cat(predicted_list)
         all_predicted = all_predicted.cpu().numpy()
         end_time = time.time()
-
+        con_metrix = confusion_matrix(all_lables, all_predicted)
         print(f"accuracy_score:{accuracy_score(all_lables, all_predicted)}")
         print(f"f1_score:{f1_score(all_lables, all_predicted, average='micro')}")
-        print(f"metrics:\n{confusion_matrix(all_lables, all_predicted)}")
+        print(f"metrics:\n{con_metrix}")
+        tp_sum = 0
+        total_sum = 0
+        for i in range(len(con_metrix[0])):
+            tp_sum += con_metrix[i][i]
+            total_sum += sum(con_metrix[i])
+        print(f"tp_sum/total_sum: {tp_sum/total_sum}")
         print(f"test time: {end_time-start_time}")
         print(f"total samples: {test_set.__len__()}")
 

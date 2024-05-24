@@ -1,11 +1,14 @@
 import torch
 from torch.utils.data import DataLoader
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from os import makedirs
 import time
 from tqdm import tqdm
-from data import Scene_Dataset
+from dataset import Scene_Dataset
 from VggNet import VggNet
 from torchvision.models import vgg16
+
+lables2name = {0:"建筑", 1:"森林", 2:"冰川", 3:"高山", 4:"大海", 5:"街景"}
 
 # 加载预训练模型
 def load_pretrained(path=None):
@@ -26,7 +29,7 @@ def train(epochs, data_dir, batch_size):
     for epoch in range(epochs):
         print(f"EPOCH: {epoch}/{epochs}")
         model.train()
-        for batch_idx, (inputs, labels) in enumerate(train_loader):
+        for batch_idx, (inputs, labels) in enumerate(tqdm(train_loader)):
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -44,7 +47,7 @@ def train(epochs, data_dir, batch_size):
         model.eval()
         with torch.no_grad():
             total_samples, total_correct = 0, 0
-            for batch_idx, (inputs, labels) in enumerate(val_loader):
+            for batch_idx, (inputs, labels) in enumerate(tqdm(val_loader)):
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model(inputs)
                 _, predicted = torch.max(outputs, 1)
@@ -59,17 +62,27 @@ def test(data_dir, batch_size):
     test_set = Scene_Dataset(data_dir, mode="test")
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4, drop_last=False)
     model.eval()
+    lables_list = []
+    predicted_list = []
     with torch.no_grad():
         total_samples, total_correct = 0, 0
         start_time = time.time()
         for batch_idx, (inputs, labels) in enumerate(tqdm(test_loader)):
             inputs, labels = inputs.to(device), labels.to(device)
+            lables_list.append(labels)
             outputs = model(inputs)
+            probap = outputs
             _, predicted = torch.max(outputs, 1)
-            total_samples += labels.size(0)
-            total_correct += (predicted == labels).sum().item()
-        print(f"test_accuracy: {total_correct / total_samples}")
+            predicted_list.append(predicted)
+        all_lables = torch.cat(lables_list)
+        all_lables = all_lables.cpu().numpy()
+        all_predicted = torch.cat(predicted_list)
+        all_predicted = all_predicted.cpu().numpy()
         end_time = time.time()
+
+        print(f"accuracy_score:{accuracy_score(all_lables, all_predicted)}")
+        print(f"f1_score:{f1_score(all_lables, all_predicted, average='micro')}")
+        print(f"metrics:\n{confusion_matrix(all_lables, all_predicted)}")
         print(f"test time: {end_time-start_time}")
         print(f"total samples: {test_set.__len__()}")
 

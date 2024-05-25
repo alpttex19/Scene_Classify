@@ -58,6 +58,7 @@ class RandomSaturation(object):
         assert self.lower >= 0, "contrast lower must be non-negative."
 
     def __call__(self, image):
+        image = image.astype(np.float64)
         if random.randint(2):
             image[:, :, 1] *= random.uniform(self.lower, self.upper)
 
@@ -70,6 +71,7 @@ class RandomHue(object):
         self.delta = delta
 
     def __call__(self, image):
+        image = image.astype(np.float64)
         if random.randint(2):
             image[:, :, 0] += random.uniform(-self.delta, self.delta)
             image[:, :, 0][image[:, :, 0] > 360.0] -= 360.0
@@ -87,6 +89,7 @@ class RandomContrast(object):
 
     # expects float image
     def __call__(self, image):
+        image = image.astype(np.float64)
         if random.randint(2):
             alpha = random.uniform(self.lower, self.upper)
             image *= alpha
@@ -100,6 +103,7 @@ class RandomBrightness(object):
         self.delta = delta
 
     def __call__(self, image):
+        image = image.astype(np.float64)
         if random.randint(2):
             delta = random.uniform(-self.delta, self.delta)
             image += delta
@@ -116,6 +120,7 @@ class RandomSampleCrop(object):
             img (Image): the cropped image
     """
     def __call__(self, image):
+        image = image.astype(np.float64)
         height, width, _ = image.shape
         # max trails (50)
         for _ in range(5):
@@ -143,6 +148,7 @@ class RandomSampleCrop(object):
 
 class Expand(object):
     def __call__(self, image):
+        image = image.astype(np.float64)
         if random.randint(2):
             return image
 
@@ -182,6 +188,7 @@ class RandomRotate(object):
         self.angle = random.uniform(-angle, angle)
 
     def __call__(self, image):
+        image = image.astype(np.float64)
         angle = random.uniform(-self.angle, self.angle)
         h, w, _ = image.shape
         center = (w / 2, h / 2)
@@ -216,11 +223,14 @@ class PhotometricDistort(object):
 
 # ----------------------- Main Functions -----------------------
 ## SSD-style Augmentation
-class SSDAugmentation(object):
+class Augmentation(object):
     def __init__(self, img_size=224):
         self.img_size = img_size
         self.augment = Compose([
-            # Expand(),                                  # 扩充增强
+            RandomSaturation(),                        # 随机饱和度
+            RandomHue(),                               # 随机色调
+            RandomContrast(),                          # 随机对比度
+            RandomBrightness(),                         # 随机亮度
             RandomSampleCrop(),                        # 随机剪裁
             RandomHorizontalFlip(),                    # 随机水平翻转
             RandomRotate(angle=10),                   # 随机旋转
@@ -238,7 +248,7 @@ class SSDAugmentation(object):
     
 
 ## SSD-style valTransform
-class SSDBaseTransform(object):
+class BaseTransform(object):
     def __call__(self, image): 
         # to tensor
         img_tensor = (torch.from_numpy(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)).permute(2,0,1)) / 255 

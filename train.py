@@ -1,13 +1,18 @@
 import torch
+import torch.utils
+import torchvision.utils
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+import os
 from os import makedirs
 import time
 from tqdm import tqdm
 from dataset import Scene_Dataset
 from VggNet import VggNet
-from data_augmentation import SSDAugmentation, SSDBaseTransform
+from data_augmentation import Augmentation, BaseTransform
 from torchvision.models import vgg16
+
+from matplotlib import pyplot as plt
 
 lables2name = {0:"建筑", 1:"森林", 2:"冰川", 3:"高山", 4:"大海", 5:"街景"}
 
@@ -21,47 +26,80 @@ def load_pretrained(path=None):
     return model
 
 def train(epochs, data_dir, batch_size):
-    ssdtransform = SSDBaseTransform()
+    basetransform = BaseTransform()
+    augmentransform = Augmentation()
     print("loading data for training...")
-    train_set = Scene_Dataset(data_dir, mode="train", transform=ssdtransform)
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
-    val_set = Scene_Dataset(data_dir, mode="val", transform=ssdtransform)
+    train_set_1 = Scene_Dataset(data_dir, mode="train", transform=augmentransform)
+    train_loader_1 = DataLoader(train_set_1, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
+    train_set_2 = Scene_Dataset(data_dir, mode="train", transform=basetransform)
+    train_loader_2 = DataLoader(train_set_2, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
+    val_set = Scene_Dataset(data_dir, mode="val", transform=basetransform)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=4, drop_last=False)
+    train_loss_list = []
+    val_loss_list = []
     for epoch in (range(epochs)):
-        average_loss = []
         print(f"EPOCH: {epoch}/{epochs}")
         model.train()
+        if (epoch < (epochs//2)):
+            train_loader = train_loader_1
+        else:
+            train_loader = train_loader_2
         pbar = tqdm(train_loader)
+        temp_train_loss = []
         for batch_idx, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
-            average_loss.append(loss.item())
+            temp_train_loss.append(loss.item())
             optimizer.step()
             if batch_idx % 10 == 0:
-                average = sum(average_loss)/len(average_loss)
+                for i in range(len(inputs)):
+                    torchvision.utils.save_image(inputs[i], os.path.join('output/images', f"image_{labels[i]}.png"))
+                train_loss_list.append(sum(temp_train_loss)/len(temp_train_loss))
+                temp_train_loss.clear()
+                average = sum(train_loss_list)/len(train_loss_list)
                 pbar.set_postfix({"train_loss": average})
                 # print(outputs.shape, "output", outputs, "labels",labels)
-        lr_scheduler.step()
 
         model.eval()
         with torch.no_grad():
             total_samples, total_correct = 0, 0
+            temp_val_loss = []
             for batch_idx, (inputs, labels) in enumerate(tqdm(val_loader)):
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model(inputs)
+                valid_loss = criterion(outputs, labels)
+                temp_val_loss.append(valid_loss.item())
                 _, predicted = torch.max(outputs, 1)
                 total_samples += labels.size(0)
                 total_correct += (predicted == labels).sum().item()
+                if batch_idx % 10 == 0:
+                    val_loss_list.append(sum(temp_val_loss)/len(temp_val_loss))
+                    temp_val_loss.clear()
+            print(f"val_loss:{sum(val_loss_list)/len(val_loss_list)}")
             print(f"val_accuracy: {total_correct / total_samples}")
-    torch.save(model.state_dict(), "output/model_epochs_20.pth")
+
+        lr_scheduler.step()
+
+    torch.save(model.state_dict(), f"output/model_epochs_aug_{epochs}.pth")
+    plt.plot(range(len(train_loss_list)), train_loss_list)
+    plt.xlabel("every 10 batches")
+    plt.ylabel("train loss")
+    plt.savefig(f"output/train_loss_aug_{epochs}.png")
+    plt.clf()
+    plt.plot(range(len(val_loss_list)), val_loss_list)
+    plt.xlabel("every 10 batches")
+    plt.ylabel("validation loss")
+    plt.savefig(f"output/val_loss_aug_{epochs}.png")
+    plt.clf()
 
 
 def test(data_dir, batch_size):
     print("loading data for testing...")
-    test_set = Scene_Dataset(data_dir, mode="test")
+    transform = BaseTransform()
+    test_set = Scene_Dataset(data_dir, mode="test", transform=transform)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4, drop_last=False)
     model.eval()
     lables_list = []
@@ -111,9 +149,9 @@ if __name__ == "__main__":
         model = VggNet().to(device)
     else:
         model = load_pretrained(args.pretrained_model).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = torch.nn.CrossEntropyLoss()
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5,gamma=0.1, last_epoch=-1)
 
     makedirs(args.output_dir, exist_ok=True)
     if args.mode == "train":

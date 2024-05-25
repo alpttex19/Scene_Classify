@@ -15,7 +15,7 @@ def load_pretrained(path=None):
         print("load pretrained model failed")
     return model
 
-
+# 预处理图像
 def preprocess_image(img_path):
     preprocess = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -51,6 +51,7 @@ def generate_cam(activations, gradients):
     heatmap = heatmap / np.max(heatmap+1e-10)
     return heatmap
 
+# 可视化Grad-CAM
 def visualize_cam(img_path, cam, output_path):
     img = cv2.imread(img_path)
     cam = cv2.resize(cam, (img.shape[1], img.shape[0]))
@@ -59,7 +60,7 @@ def visualize_cam(img_path, cam, output_path):
 
     cv2.imwrite(output_path, superimposed_img)
 
-
+# 可以放在训练循环中，用来可视化Grad-CAM
 def visualize_process(model, epoch, batch_idx, device):
     model.eval()
     target_layer = model.Conv5.conv[-3]
@@ -88,7 +89,7 @@ def visualize_process(model, epoch, batch_idx, device):
         output_path = f"./output/cam_map/{img_name[:-4]}_{epoch}_{batch_idx}.jpg"
         visualize_cam(img_path, cam, output_path)
 
-
+# 测试Grad-CAM
 if __name__== "__main__":
     lables2name = {0:"建筑", 1:"森林", 2:"冰川", 3:"高山", 4:"大海", 5:"街景"}
     model = load_pretrained('./output/model_epochs_20.pth')

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torchvision.models import vgg16
-
+# 两层卷积块
 class conv2d_block(nn.Module):
     def __init__(self, ch_in, ch_out):
         super().__init__()
@@ -15,7 +15,7 @@ class conv2d_block(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         return x
-
+# 三层卷积块
 class conv3d_block(nn.Module):
     def __init__(self, ch_in, ch_out):
         super().__init__()
@@ -74,7 +74,7 @@ class VggNet(nn.Module):
                     # bias则固定为0
                     nn.init.constant_(m.bias, 0)
 
-
+    # 前向传播
     def forward(self, x):
         x1 = self.Conv1(x)
         x = self.Maxpool(x1)
@@ -91,7 +91,7 @@ class VggNet(nn.Module):
         result = self.classifier(x)
         return result
     
-
+# 用来测试模型是否能够正常运行
 if __name__ == "__main__":
     model = VggNet()
     print(model)

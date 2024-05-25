@@ -27,6 +27,7 @@ def load_pretrained(path=None):
         print("load pretrained model failed")
     return model
 
+#  训练模型(分两个阶段，前半部分使用数据增强，后半部分不使用数据增强)
 def train(epochs, data_dir, batch_size):
     basetransform = BaseTransform()
     augmentransform = Augmentation()
@@ -42,10 +43,11 @@ def train(epochs, data_dir, batch_size):
     for epoch in (range(epochs)):
         print(f"EPOCH: {epoch}/{epochs}")
         model.train()
-        if (epoch < (0)):
+        if (epoch < (epochs//2)):
             train_loader = train_loader_1
         else:
             train_loader = train_loader_2
+        # 显示进度条
         pbar = tqdm(train_loader)
         temp_train_loss = []
         for batch_idx, (inputs, labels) in enumerate(pbar):
@@ -57,14 +59,13 @@ def train(epochs, data_dir, batch_size):
             temp_train_loss.append(loss.item())
             optimizer.step()
             if batch_idx % 10 == 0:
-                for i in range(len(inputs)):
-                    torchvision.utils.save_image(inputs[i], os.path.join('output/images', f"image_{labels[i]}.png"))
+                # 计算平均loss，并记录
                 train_loss_list.append(sum(temp_train_loss)/len(temp_train_loss))
                 temp_train_loss.clear()
                 average = sum(train_loss_list)/len(train_loss_list)
                 pbar.set_postfix({"train_loss": average})
                 # print(outputs.shape, "output", outputs, "labels",labels)
-
+        # 验证数据集
         model.eval()
         with torch.no_grad():
             total_samples, total_correct = 0, 0
@@ -82,10 +83,11 @@ def train(epochs, data_dir, batch_size):
                     temp_val_loss.clear()
             print(f"val_loss:{sum(val_loss_list)/len(val_loss_list)}")
             print(f"val_accuracy: {total_correct / total_samples}")
-
+        # 学习率调整
         lr_scheduler.step()
-
+    
     torch.save(model.state_dict(), f"output/model_epochs_{epochs}.pth")
+    # 将损失值保存为图片
     plt.plot(range(len(train_loss_list)), train_loss_list)
     plt.xlabel("every 10 batches")
     plt.ylabel("train loss")
@@ -97,7 +99,7 @@ def train(epochs, data_dir, batch_size):
     plt.savefig(f"output/val_loss_{epochs}.png")
     plt.clf()
 
-
+# 测试模型
 def test(data_dir, batch_size):
     print("loading data for testing...")
     transform = BaseTransform()
@@ -115,6 +117,7 @@ def test(data_dir, batch_size):
             probap = outputs
             _, predicted = torch.max(outputs, 1)
             predicted_list.append(predicted)
+        # 将所有的lables和predicted拼接起来，用来计算准确率
         all_lables = torch.cat(lables_list)
         all_lables = all_lables.cpu().numpy()
         all_predicted = torch.cat(predicted_list)
@@ -150,12 +153,15 @@ if __name__ == "__main__":
     if args.pretrained_model is None:
         model = VggNet().to(device)
     else:
+        # 加载预训练模型
         model = load_pretrained(args.pretrained_model).to(device)
+    # 优化器，损失函数，学习率调整器
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = torch.nn.CrossEntropyLoss()
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5,gamma=0.1, last_epoch=-1)
 
     makedirs(args.output_dir, exist_ok=True)
+    # 训练或测试
     if args.mode == "train":
         train(args.epochs, args.data_dir, args.batch_size)
     elif args.mode == "test":

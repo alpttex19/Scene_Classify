@@ -24,7 +24,7 @@ class Compose(object):
             img = t(img)
         return img
 
-
+# 功能：随机改变图像的亮度
 class ConvertColor(object):
     def __init__(self, current='BGR', transform='HSV'):
         self.transform = transform
@@ -39,7 +39,7 @@ class ConvertColor(object):
             raise NotImplementedError
         return image
 
-
+# 功能：随机改变图像的大小
 class Resize(object):
     def __init__(self, img_size=512):
         self.img_size = img_size
@@ -49,7 +49,7 @@ class Resize(object):
         
         return image
 
-
+# 功能：随机改变图像的饱和度
 class RandomSaturation(object):
     def __init__(self, lower=0.5, upper=1.5):
         self.lower = lower
@@ -64,7 +64,7 @@ class RandomSaturation(object):
 
         return image
 
-
+# 功能：随机改变图像的色调
 class RandomHue(object):
     def __init__(self, delta=18.0):
         assert delta >= 0.0 and delta <= 360.0
@@ -79,7 +79,7 @@ class RandomHue(object):
         return image
 
 
-
+#  功能：随机改变图像的对比度
 class RandomContrast(object):
     def __init__(self, lower=0.5, upper=1.5):
         self.lower = lower
@@ -95,7 +95,7 @@ class RandomContrast(object):
             image *= alpha
         return image
 
-
+# 功能：随机改变图像的亮度
 class RandomBrightness(object):
     def __init__(self, delta=32):
         assert delta >= 0.0
@@ -109,7 +109,7 @@ class RandomBrightness(object):
             image += delta
         return image
 
-
+# 功能：随机裁剪图像
 class RandomSampleCrop(object):
     """Crop
     Arguments:
@@ -145,7 +145,7 @@ class RandomSampleCrop(object):
             return current_image
         return image
 
-
+# 功能：随机扩展图像
 class Expand(object):
     def __call__(self, image):
         image = image.astype(np.float64)
@@ -167,7 +167,7 @@ class Expand(object):
 
         return image
 
-
+# 功能：随机水平翻转图像
 class RandomHorizontalFlip(object):
     def __call__(self, image):
         if random.randint(2):
@@ -175,14 +175,15 @@ class RandomHorizontalFlip(object):
 
         return image
     
-
+# 功能：随机垂直翻转图像
 class RandomVerticalFlip(object):
     def __call__(self, image):
         if random.randint(2):
             image = image[::-1, :]
 
         return image
-    
+
+# 功能：随机旋转图像    
 class RandomRotate(object):
     def __init__(self, angle=90):
         self.angle = random.uniform(-angle, angle)
@@ -197,7 +198,7 @@ class RandomRotate(object):
 
         return image
 
-
+# 功能：随机仿射变换图像
 class PhotometricDistort(object):
     def __init__(self):
         self.pd = [

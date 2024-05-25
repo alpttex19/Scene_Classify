@@ -3,18 +3,20 @@ import torch.utils
 import torchvision.utils
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
-import os
+import os, cv2, time
+import numpy as np
 from os import makedirs
-import time
 from tqdm import tqdm
 from dataset import Scene_Dataset
 from VggNet import VggNet
 from data_augmentation import Augmentation, BaseTransform
 from torchvision.models import vgg16
-
+from grad_cam import visualize_process
 from matplotlib import pyplot as plt
 
 lables2name = {0:"建筑", 1:"森林", 2:"冰川", 3:"高山", 4:"大海", 5:"街景"}
+
+
 
 # 加载预训练模型
 def load_pretrained(path=None):
@@ -40,7 +42,7 @@ def train(epochs, data_dir, batch_size):
     for epoch in (range(epochs)):
         print(f"EPOCH: {epoch}/{epochs}")
         model.train()
-        if (epoch < (epochs//2)):
+        if (epoch < (0)):
             train_loader = train_loader_1
         else:
             train_loader = train_loader_2
@@ -83,16 +85,16 @@ def train(epochs, data_dir, batch_size):
 
         lr_scheduler.step()
 
-    torch.save(model.state_dict(), f"output/model_epochs_aug_{epochs}.pth")
+    torch.save(model.state_dict(), f"output/model_epochs_{epochs}.pth")
     plt.plot(range(len(train_loss_list)), train_loss_list)
     plt.xlabel("every 10 batches")
     plt.ylabel("train loss")
-    plt.savefig(f"output/train_loss_aug_{epochs}.png")
+    plt.savefig(f"output/train_loss_{epochs}.png")
     plt.clf()
     plt.plot(range(len(val_loss_list)), val_loss_list)
     plt.xlabel("every 10 batches")
     plt.ylabel("validation loss")
-    plt.savefig(f"output/val_loss_aug_{epochs}.png")
+    plt.savefig(f"output/val_loss_{epochs}.png")
     plt.clf()
 
 
@@ -156,5 +158,5 @@ if __name__ == "__main__":
     makedirs(args.output_dir, exist_ok=True)
     if args.mode == "train":
         train(args.epochs, args.data_dir, args.batch_size)
-    else:
+    elif args.mode == "test":
         test(args.data_dir, args.batch_size)

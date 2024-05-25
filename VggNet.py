@@ -7,10 +7,8 @@ class conv2d_block(nn.Module):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3, stride=1, padding=1, bias=True),
-            # nn.BatchNorm2d(ch_out),
             nn.ReLU(inplace=True),
             nn.Conv2d(ch_out, ch_out, kernel_size=3, stride=1, padding=1, bias=True),
-            # nn.BatchNorm2d(ch_out),
             nn.ReLU(inplace=True)
         )
 
